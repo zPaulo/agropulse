@@ -1,0 +1,44 @@
+[project]
+name = "ingestion"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14.4"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "factory-boy>=3.3.3",
+    "freezegun>=1.5.5",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.12",
+    "taskipy>=1.14.1",
+    "testcontainers>=4.14.2",
+]
+
+[tool.ruff]
+line-length = 79
+extend-exclude = ['alembic', 'services']
+
+[tool.ruff.lint]
+preview = true
+select = ['I', 'F', 'E', 'W', 'PL', 'PT', 'FAST']
+
+[tool.ruff.format]
+preview = true
+quote-style = 'single'
+
+[tool.pytest.ini_options]
+pythonpath = "."
+addopts = '-p no:warnings'
+asyncio_default_fixture_loop_scope = 'function'
+
+[tool.taskipy.tasks]
+lint = 'uv run ruff check'
+pre_format = 'uv run ruff check --fix'
+format = 'uv run ruff format'
+run = 'uv run fastapi dev app/main.py'
+pre_test = 'task pre_format'
+test = 'pytest -s -x --cov=app -vv'
+post_test = 'uv run coverage html'
