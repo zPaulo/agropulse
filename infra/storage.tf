@@ -2,6 +2,10 @@ data "oci_objectstorage_namespace" "ns" {
   compartment_id = var.tenancy_ocid
 }
 
+data "oci_identity_compartment" "main" {
+  id = var.compartment_id
+}
+
 resource "oci_objectstorage_bucket" "medallion" {
   for_each = toset(var.medallion_layers)
 
@@ -19,13 +23,15 @@ resource "oci_limits_quota" "agropulse_storage_limit" {
   name           = "agropulse-storage-cap"
   description    = "Limita o uso de Object Storage do AgroPulse ao Always Free"
   statements = [
-    "set object-storage quota storage-bytes to 21474836480 in compartment ${var.compartment_name}"
+    "set object-storage quota storage-bytes to 21474836480 in compartment ${data.oci_identity_compartment.main.name}"
   ]
 }
 
 resource "oci_objectstorage_object_lifecycle_policy" "bronze_lifecycle" {
   namespace = data.oci_objectstorage_namespace.ns.namespace
   bucket    = oci_objectstorage_bucket.medallion["bronze"].name
+
+  depends_on = [oci_identity_policy.agropulse_policy]
 
   rules {
     name        = "delete-old-versions"

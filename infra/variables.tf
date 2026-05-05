@@ -68,7 +68,3 @@ variable "policy_description" {
   type        = string
   description = "Descrição da policy exibida no console OCI"
 }
-variable "compartment_name" {
-  type        = string
-  description = "Nome do compartment usado em quotas e policies (precisa bater exatamente com o nome no OCI)"
-}

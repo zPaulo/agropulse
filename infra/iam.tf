@@ -8,7 +8,8 @@ resource "oci_identity_dynamic_group" "agropulse_dynamic_group" {
 locals {
   policy_statements = [
     "Allow dynamic-group ${var.dynamic_group_name} to manage object-family in compartment id ${var.compartment_id} where target.bucket.name = /${var.bucket_prefix}-*/",
-    "Allow dynamic-group ${var.dynamic_group_name} to read objectstorage-namespaces in tenancy"
+    "Allow dynamic-group ${var.dynamic_group_name} to read objectstorage-namespaces in tenancy",
+    "Allow service objectstorage-${var.region} to manage object-family in compartment id ${var.compartment_id} where target.bucket.name = /${var.bucket_prefix}-*/"
   ]
 }
 
