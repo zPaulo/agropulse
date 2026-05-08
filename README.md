@@ -14,21 +14,31 @@
 ![Tailwind](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
 ![License MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 
-> Plataforma de inteligência de mercado para o agronegócio brasileiro, com foco em pecuária de corte e commodities agrícolas.
+> Plataforma de inteligência de **margem para pecuária de confinamento**, baseada no *cattle crush spread*: a margem entre o preço do boi gordo e seus insumos (milho e farelo de soja), ajustada pelo custo de oportunidade do capital.
 
-Projeto desenvolvido como **Trabalho de Conclusão de Curso**. Consiste em um pipeline de dados ponta a ponta que ingere preços e indicadores oficiais (CEPEA, CONAB, IBGE), aplica arquitetura *medallion* sobre Delta Lake e expõe os dados refinados via API e dashboard interativo.
+Projeto desenvolvido como **Trabalho de Conclusão de Curso** (Economia). Consiste em um pipeline de dados ponta a ponta que ingere preços oficiais à vista (CEPEA), futuros (B3) e indicadores macro (BCB), aplica arquitetura *medallion* sobre Delta Lake, calcula a margem de confinamento em tempo quase real e expõe os resultados via API e dashboard interativo.
+
+---
+
+## O problema
+
+Em pecuária de corte, a decisão econômica mais crítica do ciclo de terminação não é *quanto* o boi gordo vale hoje — é se a margem entre **receita esperada** (boi gordo) e **custo total** (alimentação + custo de oportunidade do capital empatado) **justifica confinar mais 90 a 120 dias** ou abater agora.
+
+Esse cálculo é análogo ao *crack spread* do refino de petróleo e ao *soybean crush* da indústria de esmagamento de soja: uma diferença entre o produto final e a soma ponderada de seus insumos. Toda *trading* de proteína e todo frigorífico de grande porte calcula essa margem internamente, em planilhas isoladas, com séries históricas curtas. Não há, em português, uma ferramenta pública que (i) cruze as fontes oficiais com rigor, (ii) preserve a auditabilidade do dado e (iii) entregue a margem em formato analisável.
+
+O AgroPulse preenche essa lacuna.
 
 ---
 
 ## Visão geral
 
-O AgroPulse cobre o ciclo completo de uma plataforma de dados:
+O pipeline cobre o ciclo completo de uma plataforma de dados aplicada a um problema econômico bem definido:
 
-1. **Ingestão** automatizada de fontes públicas oficiais.
-2. **Armazenamento** em camadas (*bronze*, *silver*, *gold*) sobre OCI Object Storage.
-3. **Processamento** distribuído com Databricks e Delta Lake.
+1. **Ingestão** automatizada de preços à vista (CEPEA), preços futuros (B3 BGI) e indicadores macroeconômicos (BCB).
+2. **Armazenamento** em camadas (*bronze*, *silver*, *gold*) sobre OCI Object Storage, com imutabilidade do dado bruto.
+3. **Processamento** distribuído com Databricks e Delta Lake, calculando a margem de confinamento em base diária.
 4. **Serviço** via API REST de baixa latência consultando Parquet com DuckDB.
-5. **Visualização** em dashboard responsivo com Next.js.
+5. **Visualização** em dashboard responsivo com Next.js, com decomposição do crush spread e simulador de cenários.
 
 Toda a infraestrutura é provisionada de forma reprodutível com **Terraform** na **Oracle Cloud Infrastructure (OCI)**.
 
@@ -41,14 +51,15 @@ Toda a infraestrutura é provisionada de forma reprodutível com **Terraform** n
 │   Fontes     │     │   Camadas Medallion (OCI)  │     │   Consumo    │
 │              │     │                            │     │              │
 │  CEPEA       │ ──► │   bronze (raw JSON/CSV)    │     │              │
-│  CONAB       │     │     │                      │     │              │
-│  IBGE        │     │     ▼                      │     │              │
-│              │     │   silver (parquet limpo)   │ ──► │  API Hono    │ ──► Dashboard
-└──────────────┘     │     │                      │     │  + DuckDB    │     Next.js
-       ▲             │     ▼                      │     │              │
-       │             │   gold (agregados)         │     │              │
-       │             │                            │     │              │
-       │             └────────────────────────────┘     └──────────────┘
+│  (boi/grãos) │     │     │                      │     │              │
+│              │     │     ▼                      │     │              │
+│  B3 BGI      │     │   silver (parquet limpo)   │ ──► │  API Hono    │ ──► Dashboard
+│  (futuros)   │     │     │                      │     │  + DuckDB    │     Next.js
+│              │     │     ▼                      │     │              │
+│  BCB         │     │   gold (margem +           │     │              │
+│  (Selic, FX) │     │   decomposição do crush)   │     │              │
+└──────────────┘     │                            │     └──────────────┘
+       ▲             └────────────────────────────┘
        │                          ▲
        │                          │
        │             ┌────────────┴────────────┐
@@ -63,44 +74,66 @@ Toda a infraestrutura é provisionada de forma reprodutível com **Terraform** n
 |---------------------|-------------------------------------|--------------------------------------------------|
 | Infraestrutura      | Terraform + OCI                     | Provisionamento declarativo e reprodutível       |
 | Armazenamento       | OCI Object Storage                  | Data lake nas camadas bronze / silver / gold     |
-| Ingestão            | Python 3.12, Pydantic, requests     | Coleta e validação de dados públicos             |
+| Ingestão            | Python 3.14, Pydantic, httpx        | Coleta tipada e validação *fail-fast*            |
 | Processamento       | Databricks Community + Delta Lake   | ETL distribuído com versionamento de tabelas     |
 | API                 | Hono + Bun + DuckDB                 | Consulta direta a Parquet com latência mínima    |
-| Frontend            | Next.js 15 + Tailwind               | Dashboard de preços e produção                   |
+| Frontend            | Next.js 15 + Tailwind               | Dashboard de margem e simulador de cenários      |
 | CI/CD               | GitHub Actions                      | `terraform plan/apply` e deploy da API           |
 
 ---
 
 ## Fontes de dados
 
-| Fonte                                   | Descrição                                                    | Formato     |
-|-----------------------------------------|--------------------------------------------------------------|-------------|
-| **CEPEA/ESALQ-USP**                     | Indicadores diários de preços (boi gordo, soja, milho, café) | CSV / XLS   |
-| **CONAB**                               | Safras, estoques e custos de produção                        | CSV         |
-| **IBGE (PPM, PAM, SIDRA)**              | Pesquisa pecuária, agrícola e censo agropecuário             | API JSON    |
+| Fonte                                    | Variáveis                                                       | Papel no modelo                          |
+|------------------------------------------|-----------------------------------------------------------------|------------------------------------------|
+| **CEPEA / ESALQ-USP**                    | Indicador do boi gordo (BGI), milho e farelo de soja            | Receita e custos variáveis à vista       |
+| **B3 (Bolsa Brasil Balcão)**             | Cotações de ajuste do contrato futuro de boi gordo (BGI)        | Expectativa de mercado e *hedge*         |
+| **BCB / SGS**                            | Taxa Selic e câmbio USD/BRL (PTAX)                              | Custo de oportunidade do capital e paridade de exportação |
+
+> Fontes complementares (CONAB, IBGE/SIDRA) podem ser incorporadas como variáveis de controle em iterações posteriores, mas não fazem parte do escopo mínimo do TCC.
+
+---
+
+## O que é o *cattle crush spread*
+
+A margem bruta diária do confinamento, em R\$/@ de carcaça, pode ser decomposta como:
+
+```
+Margem = Receita(boi gordo) − Custo alimentar(milho, farelo de soja) − Custo de oportunidade(Selic × capital empatado × dias)
+```
+
+O *gold* do *data lake* materializa essa margem em base diária, com cada componente isolado para que a decomposição seja auditável e o efeito de cada variável (preço do boi, preço dos grãos, taxa de juros) possa ser analisado separadamente.
 
 ---
 
 ## Roadmap de execução
 
-O projeto é entregue em etapas, com cada uma se apoiando na anterior:
+O projeto é entregue em etapas, cada uma se apoiando na anterior:
 
 1. **Etapa 1, Infra base (Terraform):** VCN, Object Storage (bronze/silver/gold), IAM e remote state.
-2. **Etapa 2, Ingestão (Python):** scrapers tipados, validação Pydantic, upload para *bronze*.
-3. **Etapa 3, Pipeline medallion (Databricks):** transformação *bronze → silver → gold* com Delta Lake.
+2. **Etapa 2, Ingestão (Python):** *scrapers* tipados para CEPEA, B3 e BCB, com validação Pydantic e *upload* para *bronze*.
+3. **Etapa 3, Pipeline medallion (Databricks):** transformação *bronze → silver → gold* com Delta Lake; cálculo da margem e decomposição do *crush*.
 4. **Etapa 4, Compute (Terraform):** provisionamento da instância que hospeda a API.
-5. **Etapa 5, API (Hono + Bun):** endpoints servindo dados *gold* via DuckDB sobre Parquet.
-6. **Etapa 6, Dashboard (Next.js):** visualização interativa, deployada na Vercel.
+5. **Etapa 5, API (Hono + Bun):** *endpoints* servindo séries de margem e cenários via DuckDB sobre Parquet.
+6. **Etapa 6, Dashboard (Next.js):** visualização da margem histórica, decomposição e simulador de confinamento; *deploy* na Vercel.
 
 ---
 
 ## Decisões de design
 
-- **Por que OCI e não AWS?** O *Always Free Tier* da Oracle inclui Compute, Object Storage e rede sem prazo de expiração, o que viabiliza o projeto sem custo recorrente.
-- **Por que medallion (bronze/silver/gold)?** É um padrão consolidado em engenharia de dados que separa claramente *raw immutable*, *cleaned* e *business-ready*.
-- **Por que DuckDB na API?** Permite consultas SQL sub-segundo direto sobre Parquet no Object Storage, sem precisar de um banco transacional separado.
-- **Por que Hono + Bun?** Framework leve com *cold start* mínimo, adequado a uma instância OCI de baixa especificação.
+- **Por que margem de confinamento?** O cálculo é universal entre frigoríficos e *traders*, mas hoje vive em planilhas isoladas. Existe um *gap* claro de ferramenta pública em PT-BR e uma decisão econômica relevante atrelada (confinar × abater).
+- **Por que OCI e não AWS?** O *Always Free Tier* da Oracle inclui *Compute*, *Object Storage* e rede sem prazo de expiração, viabilizando o projeto sem custo recorrente.
+- **Por que medallion (bronze/silver/gold)?** Padrão consolidado em engenharia de dados que separa claramente *raw immutable*, *cleaned* e *business-ready*. Garante auditabilidade do dado bruto, requisito acadêmico essencial.
+- **Por que Selic como custo de oportunidade?** Proxy padrão em finanças corporativas para o custo do capital de baixo risco no Brasil. Pode ser substituída por CDI ou IPCA+ em variantes do modelo.
+- **Por que DuckDB na API?** Permite consultas SQL sub-segundo direto sobre Parquet no *Object Storage*, sem banco transacional separado — adequado a séries temporais financeiras.
+- **Por que Hono + Bun?** *Framework* leve com *cold start* mínimo, adequado à instância OCI de baixa especificação.
 - **Por que Pydantic na ingestão?** Garante que dados malformados das fontes públicas falhem cedo, antes de poluir o *bronze*.
+
+---
+
+## Documentação complementar
+
+- [`plan.md`](plan.md) — passo a passo conceitual do pipeline, com boas práticas em cada etapa.
 
 ---
 
