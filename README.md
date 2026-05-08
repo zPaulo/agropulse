@@ -22,7 +22,7 @@ Projeto desenvolvido como **Trabalho de Conclusão de Curso** (Economia). Consis
 
 ## O problema
 
-Em pecuária de corte, a decisão econômica mais crítica do ciclo de terminação não é *quanto* o boi gordo vale hoje — é se a margem entre **receita esperada** (boi gordo) e **custo total** (alimentação + custo de oportunidade do capital empatado) **justifica confinar mais 90 a 120 dias** ou abater agora.
+Em pecuária de corte, a decisão econômica mais crítica do ciclo de terminação não é *quanto* o boi gordo vale hoje, e sim se a margem entre **receita esperada** (boi gordo) e **custo total** (alimentação + custo de oportunidade do capital empatado) **justifica confinar mais 90 a 120 dias** ou abater agora.
 
 Esse cálculo é análogo ao *crack spread* do refino de petróleo e ao *soybean crush* da indústria de esmagamento de soja: uma diferença entre o produto final e a soma ponderada de seus insumos. Toda *trading* de proteína e todo frigorífico de grande porte calcula essa margem internamente, em planilhas isoladas, com séries históricas curtas. Não há, em português, uma ferramenta pública que (i) cruze as fontes oficiais com rigor, (ii) preserve a auditabilidade do dado e (iii) entregue a margem em formato analisável.
 
@@ -125,7 +125,7 @@ O projeto é entregue em etapas, cada uma se apoiando na anterior:
 - **Por que OCI e não AWS?** O *Always Free Tier* da Oracle inclui *Compute*, *Object Storage* e rede sem prazo de expiração, viabilizando o projeto sem custo recorrente.
 - **Por que medallion (bronze/silver/gold)?** Padrão consolidado em engenharia de dados que separa claramente *raw immutable*, *cleaned* e *business-ready*. Garante auditabilidade do dado bruto, requisito acadêmico essencial.
 - **Por que Selic como custo de oportunidade?** Proxy padrão em finanças corporativas para o custo do capital de baixo risco no Brasil. Pode ser substituída por CDI ou IPCA+ em variantes do modelo.
-- **Por que DuckDB na API?** Permite consultas SQL sub-segundo direto sobre Parquet no *Object Storage*, sem banco transacional separado — adequado a séries temporais financeiras.
+- **Por que DuckDB na API?** Permite consultas SQL sub-segundo direto sobre Parquet no *Object Storage*, sem banco transacional separado, adequado a séries temporais financeiras.
 - **Por que Hono + Bun?** *Framework* leve com *cold start* mínimo, adequado à instância OCI de baixa especificação.
 - **Por que Pydantic na ingestão?** Garante que dados malformados das fontes públicas falhem cedo, antes de poluir o *bronze*.
 
@@ -133,7 +133,7 @@ O projeto é entregue em etapas, cada uma se apoiando na anterior:
 
 ## Documentação complementar
 
-- [`plan.md`](plan.md) — passo a passo conceitual do pipeline, com boas práticas em cada etapa.
+- [`plan.md`](plan.md): passo a passo conceitual do pipeline, com boas práticas em cada etapa.
 
 ---
 

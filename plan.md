@@ -1,4 +1,4 @@
-# Plan — AgroPulse
+# Plan: AgroPulse
 
 > Documento de plano conceitual do projeto. Não contém código: descreve **o que** cada etapa faz, **por que** existe e **boas práticas** que orientam cada decisão. O leitor-alvo é o próprio autor (revisão pessoal) e a banca de Economia (defesa).
 
@@ -8,7 +8,7 @@
 
 ### 1.1. Contexto
 
-A pecuária de corte brasileira opera sob ciclos longos (de 24 a 36 meses do nascimento ao abate). A fase de **terminação em confinamento** — últimos 90 a 120 dias, com alimentação intensiva à base de milho e farelo de soja — concentra a maior parte do custo variável e é a única janela em que o pecuarista tem controle direto sobre o *trade-off* entre **ganho de peso adicional** e **custo do capital empatado**.
+A pecuária de corte brasileira opera sob ciclos longos (de 24 a 36 meses do nascimento ao abate). A fase de **terminação em confinamento** (últimos 90 a 120 dias, com alimentação intensiva à base de milho e farelo de soja) concentra a maior parte do custo variável e é a única janela em que o pecuarista tem controle direto sobre o *trade-off* entre **ganho de peso adicional** e **custo do capital empatado**.
 
 A decisão que orienta todo o ciclo financeiro do confinador é simples na superfície, mas combina três fontes de incerteza:
 
@@ -18,15 +18,15 @@ A decisão que orienta todo o ciclo financeiro do confinador é simples na super
 
 O conceito é análogo ao *crack spread* do refino de petróleo (diferença entre o preço do barril e a soma ponderada da gasolina e diesel produzidos a partir dele) e ao *soybean crush* da indústria de esmagamento (diferença entre o grão de soja e a soma ponderada do óleo e farelo). No caso bovino, a decomposição é:
 
-- **Receita marginal** — preço do boi gordo (CEPEA/BGI) × peso de carcaça produzido.
-- **Custo direto** — preço do milho × consumo + preço do farelo × consumo + outros (suplementos, mão-de-obra, sanidade) — esses últimos podem entrar como parâmetro fixo ou ser estimados a partir de literatura aplicada.
-- **Custo de oportunidade** — taxa Selic × capital total empatado × duração do confinamento.
+- **Receita marginal:** preço do boi gordo (CEPEA/BGI) × peso de carcaça produzido.
+- **Custo direto:** preço do milho × consumo + preço do farelo × consumo + outros (suplementos, mão-de-obra, sanidade); esses últimos podem entrar como parâmetro fixo ou ser estimados a partir de literatura aplicada.
+- **Custo de oportunidade:** taxa Selic × capital total empatado × duração do confinamento.
 
 O AgroPulse calcula essa margem em **base diária**, com cada componente isolado, permitindo análise contrafactual: *o que aconteceu primeiro, o boi caiu ou o milho subiu?*
 
 ### 1.3. Por que isso é interessante para a banca
 
-- **Decisão real, mensurável:** não é um exercício acadêmico — é a métrica que rege bilhões em capital de giro de frigoríficos e *traders*.
+- **Decisão real, mensurável:** não é um exercício acadêmico, e sim a métrica que rege bilhões em capital de giro de frigoríficos e *traders*.
 - **Gap de ferramenta pública:** o cálculo existe internamente em todos os grandes *players*, mas não há observatório público no Brasil. O TCC entrega valor além do exercício acadêmico.
 - **Conexão com teoria:** custo de oportunidade (microeconomia), risco de base e *hedge* (finanças), cointegração de séries (econometria).
 
@@ -63,9 +63,9 @@ O pipeline implementa o padrão **medallion** (bronze / silver / gold), consagra
 
 ## 4. Etapas de execução
 
-### Etapa 1 — Infraestrutura como código (Terraform + OCI)
+### Etapa 1: Infraestrutura como código (Terraform + OCI)
 
-**Objetivo:** provisionar VCN, *buckets* de Object Storage (bronze/silver/gold), IAM e *remote state* — tudo declarativo e reprodutível.
+**Objetivo:** provisionar VCN, *buckets* de Object Storage (bronze/silver/gold), IAM e *remote state*, tudo declarativo e reprodutível.
 
 **Boas práticas:**
 
@@ -79,13 +79,13 @@ O pipeline implementa o padrão **medallion** (bronze / silver / gold), consagra
 
 ---
 
-### Etapa 2 — Ingestão (Python)
+### Etapa 2: Ingestão (Python)
 
 **Objetivo:** *scrapers* tipados para CEPEA, B3 e BCB que validam o dado, persistem o bruto no *bronze* e geram metadados de auditoria.
 
 **Boas práticas:**
 
-- **Arquitetura hexagonal (ports & adapters).** Cada fonte é um *adapter* que satisfaz uma interface única (`DataSource`). O *use case* de ingestão não sabe se está pegando CEPEA ou BCB — pede o dado por contrato. Isso permite testar offline e trocar fontes sem reescrever a lógica.
+- **Arquitetura hexagonal (ports & adapters).** Cada fonte é um *adapter* que satisfaz uma interface única (`DataSource`). O *use case* de ingestão não sabe se está pegando CEPEA ou BCB; pede o dado por contrato. Isso permite testar offline e trocar fontes sem reescrever a lógica.
 - **Validação *fail-fast* com Pydantic.** Dado malformado deve quebrar o *job* antes de tocar o *bronze*. Um *bronze* poluído é dívida técnica permanente.
 - **Idempotência.** Re-rodar o *job* duas vezes para o mesmo dia não pode duplicar dado. Use chaves naturais (data + fonte + indicador) e particionamento determinístico.
 - **Particionamento por data desde o início.** Estrutura de pastas `bronze/<fonte>/<indicador>/dt=YYYY-MM-DD/`. Facilita reprocessamento parcial e *time travel* manual.
@@ -98,7 +98,7 @@ O pipeline implementa o padrão **medallion** (bronze / silver / gold), consagra
 
 ---
 
-### Etapa 3 — Processamento medallion (Databricks + Delta Lake)
+### Etapa 3: Processamento medallion (Databricks + Delta Lake)
 
 **Objetivo:** transformar *bronze → silver → gold*, calculando a margem de confinamento e sua decomposição.
 
@@ -115,7 +115,7 @@ O pipeline implementa o padrão **medallion** (bronze / silver / gold), consagra
 
 **Boas práticas:**
 
-- **Cálculo da margem isolado por componente.** Não materialize só o número final. Materialize: receita, custo alimentar, custo de oportunidade — em colunas separadas. Permite decomposição na visualização.
+- **Cálculo da margem isolado por componente.** Não materialize só o número final. Materialize: receita, custo alimentar, custo de oportunidade, em colunas separadas. Permite decomposição na visualização.
 - **Versionamento via Delta *time travel*.** Quando a metodologia mudar (ex.: substituir Selic por CDI), o histórico antigo continua acessível.
 - **Não recalcular tudo a cada dia.** *Incremental processing*: processe apenas as partições novas, com *watermark* explícito.
 - **Documentar premissas no nome da coluna ou em metadados.** `margem_bruta_diaria_brl_arroba_v1` é melhor que `margem`.
@@ -124,7 +124,7 @@ O pipeline implementa o padrão **medallion** (bronze / silver / gold), consagra
 
 ---
 
-### Etapa 4 — *Compute* para a API (Terraform)
+### Etapa 4: *Compute* para a API (Terraform)
 
 **Objetivo:** instância OCI mínima (Always Free) com *firewall*, *systemd* e *reverse proxy*.
 
@@ -137,7 +137,7 @@ O pipeline implementa o padrão **medallion** (bronze / silver / gold), consagra
 
 ---
 
-### Etapa 5 — API (Hono + Bun + DuckDB)
+### Etapa 5: API (Hono + Bun + DuckDB)
 
 **Objetivo:** *endpoints* REST que servem (i) séries históricas de margem, (ii) decomposição por período, (iii) simulação de cenários.
 
@@ -145,21 +145,21 @@ O pipeline implementa o padrão **medallion** (bronze / silver / gold), consagra
 
 - ***Endpoints* com semântica clara.** `/margins?from=...&to=...&granularity=daily` é melhor que `/data?q=...`.
 - **Documentação OpenAPI gerada automaticamente.** Serve de contrato com o *frontend* e de documentação de TCC.
-- **Cache em memória para consultas frequentes.** Margem de ontem não muda — cache de 5 min reduz pressão sobre o Object Storage.
+- **Cache em memória para consultas frequentes.** Margem de ontem não muda; cache de 5 min reduz pressão sobre o Object Storage.
 - ***Rate limiting* mesmo num projeto pequeno.** Boa higiene desde o início.
 - **DuckDB sobre Parquet remoto.** Aprenda a usar *predicate pushdown* para reduzir bytes lidos.
 - **Validação de entrada com Zod (TS).** Espelha a filosofia *fail-fast* do Pydantic na ingestão.
 
 ---
 
-### Etapa 6 — Dashboard (Next.js + Tailwind)
+### Etapa 6: Dashboard (Next.js + Tailwind)
 
-**Objetivo:** três telas principais — margem histórica, decomposição do *crush*, simulador de cenários.
+**Objetivo:** três telas principais: margem histórica, decomposição do *crush*, simulador de cenários.
 
 **Boas práticas:**
 
 - ***Server Components* por padrão; *Client Components* só quando precisar de interatividade.** Reduz JS enviado ao cliente.
-- **Visualizações simples e auditáveis.** Linha temporal da margem, *stacked area* da decomposição, sliders no simulador. Evite *charts* exóticos — economista lê linha e barra com fluência.
+- **Visualizações simples e auditáveis.** Linha temporal da margem, *stacked area* da decomposição, sliders no simulador. Evite *charts* exóticos; economista lê linha e barra com fluência.
 - ***Loading states* explícitos.** Dado vem da API; treine bons padrões de UX assíncrona.
 - **Acessibilidade.** Cores com contraste adequado, *labels* em todos os inputs do simulador.
 
@@ -184,10 +184,10 @@ A banca é de Economia. Mesmo que o produto principal seja de engenharia de dado
 
 ## 6. Como apresentar para uma banca de economia
 
-- **Comece pelo problema, não pela tecnologia.** Abra com "o pecuarista decide diariamente entre confinar mais X dias ou abater" — não com "construí um *data lake* na OCI". A tecnologia é meio, o problema é fim.
+- **Comece pelo problema, não pela tecnologia.** Abra com "o pecuarista decide diariamente entre confinar mais X dias ou abater", não com "construí um *data lake* na OCI". A tecnologia é meio, o problema é fim.
 - **Use analogias econômicas para conceitos técnicos.** "Medallion" = "regimes de tratamento progressivo do dado, análogo a estágios de manufatura". "Pydantic" = "controle de qualidade na entrada, análogo a inspeção em ponto de recebimento". A banca conecta.
 - **Mostre uma decisão real sendo tomada.** O simulador do dashboard é a peça mais persuasiva da defesa. Permita à banca tocar nos *sliders* (Selic, preço do milho) e ver a margem mudar.
-- **Seja honesto com limitações.** "Não modelamos custos não-alimentares — eles entram como parâmetro" é melhor do que esconder a simplificação.
+- **Seja honesto com limitações.** "Não modelamos custos não-alimentares; eles entram como parâmetro" é melhor do que esconder a simplificação.
 - **Conecte com literatura.** Há trabalhos sobre *crush spread* em *commodities* agrícolas (Wisner, Irwin & Good, Hayenga). Citá-los ancora o trabalho na fronteira acadêmica.
 
 ---
@@ -216,10 +216,10 @@ Mantém-se de fora do escopo mínimo, mas vale registrar para futura referência
 ## 9. Onde aprender (referências canônicas)
 
 - **Arquitetura:** [Architecture Patterns with Python (Cosmic Python)](https://www.cosmicpython.com/book/preface.html), capítulos 1–6.
-- **Hexagonal:** [Alistair Cockburn — Hexagonal Architecture](https://alistair.cockburn.us/hexagonal-architecture/).
-- **Medallion:** [Databricks Glossary — Medallion Architecture](https://www.databricks.com/glossary/medallion-architecture).
-- **Delta Lake:** [Delta Lake Documentation — Concepts](https://docs.delta.io/latest/delta-intro.html).
+- **Hexagonal:** [Alistair Cockburn: Hexagonal Architecture](https://alistair.cockburn.us/hexagonal-architecture/).
+- **Medallion:** [Databricks Glossary: Medallion Architecture](https://www.databricks.com/glossary/medallion-architecture).
+- **Delta Lake:** [Delta Lake Documentation: Concepts](https://docs.delta.io/latest/delta-intro.html).
 - **Boas práticas Python:** [The Twelve-Factor App](https://12factor.net/) (especialmente seções III, X, XI).
 - **Pydantic:** [docs.pydantic.dev](https://docs.pydantic.dev/latest/).
-- **Crush spread (literatura aplicada):** Hayenga & DiPietre (1982), *Hedging Wholesale Meat Prices*; Wisner, *Iowa Soybean Crush Margin Outlook*; Irwin & Good (Ag Markdaily) — buscar via Google Scholar.
+- **Crush spread (literatura aplicada):** Hayenga & DiPietre (1982), *Hedging Wholesale Meat Prices*; Wisner, *Iowa Soybean Crush Margin Outlook*; Irwin & Good (Ag Markdaily); buscar via Google Scholar.
 - **Séries temporais financeiras:** Tsay, *Analysis of Financial Time Series*; Enders, *Applied Econometric Time Series*.
